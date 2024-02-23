@@ -1,80 +1,70 @@
-//html elements
-
-const canvas = document.getElementById('canvas')
-const ctx = canvas.getContext('2d');
-
-canvas.width = 720*1.5;
-canvas.height = 360*1.5;
-
-ctx.translate(0, canvas.height);
-ctx.scale(1, -1);
-
-const pcanvas = document.getElementById('pcanvas');
-const pctx = pcanvas.getContext('2d');
-
-pcanvas.width = 720*1.5;
-pcanvas.height = 360*1.5;
-
-pctx.translate(0, canvas.height);
-pctx.scale(1, -1);
-
-const biterate = document.getElementById('biterate');
-
-const colorDict = {0:'black', 1:'lightblue', 2:'magenta', 3:'gold', 4:'#808000'}
-
 //variables
 let interval;
 
+var J;
+
+let minz = new Complex(-2, -2);
+let maxz = new Complex(2, 2);
+let eps = 0.05; //epsilon for normal julia, honestly i have no idea why this epsilon matters so much for computation
+let eps2 = 0.002; //epsilon for polynomial_julia
+
+var xdense = 100;
+var ydense = 50;
+
+var s = 1; //size of points
+
+var juliaN = 70000; //how many preimages to calculate
+var newtonN1 = 40; //how many times to iterate newton raphson when calculating preimages
+var newtonN2 = 100; //how many times to iterate newton raphson when calculating fixed points
+
 //functions
 
-function rgbToHex(rgb){
-    let x = Math.floor(rgb[0]/16);
-    let x2 = parseInt(rgb[0]-x*16);
-    let y = Math.floor(rgb[1]/16);
-    let y2 = parseInt(rgb[1]-y*16);
-    let z = Math.floor(rgb[2]/16);
-    let z2 = parseInt(rgb[2]-z*16);
-    x = x.toString(16)
-    x2 = x2.toString(16)
-    y = y.toString(16)
-    y2 = y2.toString(16)
-    z = z.toString(16)
-    z2 = z2.toString(16)
+function binaryEdge(picture){
+    let C = picture.data;
+    let edgeCoords = [];
 
-    return '#' + x + x2 + y + y2 + z + z2;
-}
+    for(let i=1; i<C.length-1; i++){
+        for(let j=1; j<C[0].length-1; j++){
 
-function plotArray(canvas, array, strength=120){
+            let flag = true;
+            let sub = picture.subMatrix(i-1, i+1+1, j-1, j+1+1).data;
+            for(let r=0; r<sub.length; r++){
+                for(let c=0; c<sub[0].length; c++){
+                    if(sub[r][c]!=C[i][j]){
+                        flag = false;
+                    }
+                }
+            }
 
-    let ctx = canvas.getContext('2d');
-
-    let xres = canvas.width / array.length;
-    let yres = canvas.height / array[0].length;
-
-    for(let i=0; i<canvas.width; i+=xres){
-        for(let j=0; j<canvas.height; j+=yres){
-            let color = array[parseInt(i/xres)][parseInt(j/yres)];
-            let style = rgbToHex([color*strength, 0, 0]);
-            ctx.fillStyle = style;
-            ctx.fillRect(i, j, Math.ceil(xres)+1, Math.ceil(yres)+1);
-            ctx.fill();
+            if(!flag){
+                edgeCoords.push([i,j])
+            }
         }
     }
+
+    let im = [];
+    for(let i=0; i<C.length; i++){
+        im.push([]);
+        for(let j=0; j<C[0].length; j++){
+            im[i].push(0);
+        }
+    }
+    for(let p of edgeCoords){
+        im[p[0]][p[1]] = 1;
+    }
+
+    return new Matrix(im);
 }
 
-function plotPoint(canvas, z, z0, z1, s, color = 'gold'){
-
-    let ctx = canvas.getContext('2d');
-
-    let diff = z1.sub(z0);
-
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc((z.re-z0.re)/diff.re * canvas.width, (z.im-z0.im)/diff.im * canvas.height, s, 0, 2*Math.PI);
-    ctx.fill();
+function iterate(points){
+    let newpoints = [];
+    for(let p of points){
+        newpoints.push(R(p));
+    }
+    return newpoints;
 }
 
-function julia(R, eps, z0, z1, args = {'bound':4, 'niter':20, 'halo':1}){
+function polynomial_julia(R, eps, z0, z1, args = {'bound':4, 'niter':20, 'halo':1}){
 
     let bound;
     let niter;
@@ -123,126 +113,308 @@ function julia(R, eps, z0, z1, args = {'bound':4, 'niter':20, 'halo':1}){
     return new Matrix(C);
 }
 
-function binaryEdge(picture){
-    let C = picture.data;
-    let edgeCoords = [];
+//Newton Raphson Helper Functions
 
-    for(let i=1; i<C.length-1; i++){
-        for(let j=1; j<C[0].length-1; j++){
+function createPoly(arr){//turns nx2 array into degree n complex polynomial
 
-            let flag = true;
-            let sub = picture.subMatrix(i-1, i+1+1, j-1, j+1+1).data;
-            for(let r=0; r<sub.length; r++){
-                for(let c=0; c<sub[0].length; c++){
-                    if(sub[r][c]!=C[i][j]){
-                        flag = false;
-                    }
-                }
+    let P = [];
+    for(let coeff of arr){
+        P.push(new Complex(coeff[0], coeff[1]));
+    }
+
+    return P;
+}
+
+function evaluate(P, z){ //evaluates polynomial P at z
+
+    let s = P[0];
+    for(let i=1; i<P.length; i++){
+        s=s.add(P[i].mult(z.pow(i)));
+    }
+
+    return s;
+}
+
+function derivative(P){ //returns derivative of polynomial
+
+    if(P.length==1){
+        return [new Complex(0,0)];
+    }
+
+    let dP = [];
+    for(let i=1; i<P.length; i++){
+        dP.push(P[i].mult(new Complex(i, 0)));
+    }
+
+    return dP;
+
+}
+
+function newton_raphson(P, z0, niter){
+    let z = z0;
+    let dP = derivative(P);
+    let q = rational(P, dP);
+
+    for(let i=0; i<niter; i++){
+        z = z.sub(q(z));
+    }
+
+    return z;
+}
+
+function rational(P, Q){ //creates rational function from polynomials, represented as coefficient arrays
+    
+    return (z)=>{
+
+        if(z.re == Infinity){
+            if(P.length>Q.length){ //this line here assumes that the polynomials are represented without trailing zeros
+                return z;
+            }
+            else if(P.length<Q.length){
+                return new Complex(0,0);
+            }
+            else{
+                return P[P.length-1].div(Q[Q.length-1]);
+            }
+        }
+
+        else{
+
+            let pz = evaluate(P, z);
+            let qz = evaluate(Q, z);
+
+            if(qz.abs<0.000000001){
+                return new Complex(Infinity, Infinity);
             }
 
-            if(!flag){
-                edgeCoords.push([i,j])
+            else{
+                return pz.div(qz);
             }
         }
     }
 
-    let im = [];
-    for(let i=0; i<C.length; i++){
-        im.push([]);
-        for(let j=0; j<C[0].length; j++){
-            im[i].push(0);
+}
+
+function remove_trailing_zeros(P){
+
+    let n = 0;
+    for(let i=P.length-1; i>0; i--){
+        if(P[i].abs > 0.000000001){
+            n = i;
+            break;
         }
     }
-    for(let p of edgeCoords){
-        im[p[0]][p[1]] = 1;
-    }
 
-    return new Matrix(im);
+    return jsn.parse(P, 0, n+1, 1);
 }
 
-function iterate(points){
-    let newpoints = [];
-    for(let p of points){
-        newpoints.push(R(p));
+function same_length(P,Q){
+    
+    let n = P.length;
+    let m = Q.length;
+
+    if(n<m){
+        for(let i=0; i<m-n; i++){
+            P.push(new Complex(0,0));
+        }
     }
-    return newpoints;
+    else if(n>m){
+        for(let i=0; i<n-m; i++){
+            Q.push(new Complex(0,0));
+        }
+    }
 }
 
-function biterateFunc(){
+function multiply_poly(P,Q){ //multiply P and Q
 
-    if(interval){
-        return;
+    same_length(P, Q);
+
+    let vP = jsn.fft(jsn.fpad(P, 1));
+    let vQ = jsn.fft(jsn.fpad(Q, 1));
+
+    let prod = [];
+    for(let i=0; i<vP.length; i++){
+        prod.push(vP[i].mult(vQ[i]));
     }
 
-    let newpoints = iterate(points);
+    return remove_trailing_zeros(jsn.ifft(prod));
+}
 
-    let temp = [];
+function subtract_poly(P, Q){
 
-    let t = 0;
-    let tfinal = 1;
+    same_length(P, Q);
+    let h = [];
 
-    interval = setInterval(()=>{
+    for(let i=0; i<P.length; i++){
+        h.push(P[i].sub(Q[i]));
+    }
 
-        pctx.clearRect(0,0,pcanvas.width, pcanvas.height);
+    return h;
+}
 
-        if(t>=1){
-            for(let i=0; i<newpoints.length; i++){
-                plotPoint(pcanvas, newpoints[i], z0, z1, s);
+function divide_poly(P, Q){ //assuming Q is a degree 1 polynomial which divides P
+
+    same_length(P, Q);
+
+    let vP = jsn.fft(jsn.fpad(P));
+    let vQ = jsn.fft(jsn.fpad(Q));
+
+    //locate zero of Q
+    let n = -1;
+    for(let i=0; i<vQ.length; i++){
+        if(vQ[i].abs < 0.0000000000000001){
+            n = i;
+            break;
+        }
+    }
+
+    //divide values
+
+    let h = [];
+    for(let i=0; i<vP.length; i++){
+        if(i==n){
+            h.push((vP[i].add(new Complex(0.00001, 0.00001))).div(vQ[i].add(new Complex(0.00001, 0.00001))));
+        }
+        else{
+            h.push(vP[i].div(vQ[i]));
+        }
+    }
+
+    return remove_trailing_zeros(jsn.ifft(h));
+
+}
+
+function julia_fixed_point(P, Q){ //finds fixed point of a rational function P/Q with multiplier 1 or with abs>1
+
+    //calculate H = P-zQ
+    let H = [P[0]];
+
+    same_length(P, Q);
+
+    for(let i=1; i<P.length; i++){
+        H.push(P[i].sub(Q[i-1]));
+    }
+
+    H.push(Q[Q.length-1].mult(new Complex(-1, 0)));
+
+    //calculate the derivative of R
+    let dP = derivative(P);
+    let dQ = derivative(Q);
+
+    //make derivatives be same length as P, Q
+    dP.push(new Complex(0,0));
+    dQ.push(new Complex(0,0));
+
+    let Qsquared = remove_trailing_zeros(multiply_poly(Q, Q));
+    let numerator = remove_trailing_zeros(subtract_poly(multiply_poly(dP, Q), multiply_poly(dQ, P)));
+
+    let dR = rational(numerator, Qsquared);
+    
+    //start looking for fixed points
+    for(let i=0; i<P.length; i++){
+        
+        //generate guess for newton raphson method
+        let x = jsn.random(-1, 1);
+        let y = jsn.random(-1, 1);
+    
+        let z0 = new Complex(x,y);
+        
+
+        //calculate root of H
+        let r1 = newton_raphson(H, z0, newtonN2);
+
+        let v = dR(r1);
+        
+        if(v.abs>0 || Math.abs(v.abs-1)<0.00000000000001){
+            return r1;
+        }
+
+        else{
+            H = divide_poly(H, [r1, new Complex(1,0)]);
+        }
+
+    }
+
+    return new Complex(Infinity, Infinity);
+    
+}
+
+function julia(P, Q, niter){
+
+    //Step 1: Calculate points in julia set, specifically itll be a fixed point that is repelling/with multiplier 1
+    let z0 = julia_fixed_point(P, Q);
+
+    let J = [z0];
+
+    //step 2: Calculate a random pre-image of z0
+    //note that by now P and Q are of the same length already
+    for(let iter=0; iter<niter; iter++){
+
+        //case where z0 is infinity - we find a root of Q
+        if(z0.re == Infinity){
+            //initialize newton-raphson guess
+            let x = jsn.random(-5, 5);
+            let y = jsn.random(-5 ,5);
+        
+            let w = new Complex(x,y);
+
+            let z1 = newton_raphson(Q, w, newtonN1);
+            J.push(z1);
+            z0 = z1;
+        }
+
+        else{
+            let h = [];
+            for(let i=0; i<P.length; i++){
+                h.push(P[i].sub((z0.mult(Q[i]))));
             }
-            points = newpoints;
-            interval = clearInterval(interval);
+        
+            let x = jsn.random(-5, 5);
+            let y = jsn.random(-5 ,5);
+        
+            let w = new Complex(x,y);
+            let z1 = newton_raphson(h, w, newtonN1);
+            J.push(z1);
+            z0 = z1;
         }
 
-        for(let i=0; i<newpoints.length; i++){
-            temp[i] = points[i].mult(new Complex(1-t**3, 0)).add(newpoints[i].mult(new Complex(t**3, 0)));
-            plotPoint(pcanvas, temp[i], z0, z1, s);
-        }
-
-        t+=16/(1000*tfinal);
-
-    }, 16)
-    for(let p of points){
-        plotPoint(pcanvas, p, z0, z1, s);
     }
-}
 
-function R(z){
-    return (z.mult(z).add((new Complex(0.33, 0.175)))); //remember 0.3,0.5 since it can be a good component tester
-    //nice functions: c=0.3+0.5i, c=-0.1-0.7i, c=-0.5-0.51i
+    return J;
 }
 
 
-//plotting the julia set
+// let P = createPoly([[1, 0], [0, 0], [1, 0]]);
 
-let z0 = new Complex(-2, -1.2);
-let z1 = new Complex(2, 1.2);
-let eps = 0.002; //0.002 good
+//interesting functions:
 
-let C = julia(R, eps, z0, z1, args = {'bound':4,'niter':100, 'halo':0});
+//julia set is on a differentiable curve?
+// let P = createPoly([[1, 0], [1, 0], [0, 1], [0,0]]);
+// let Q = createPoly([[1, 0], [0, 1], [0, 1]]);
 
-let e = binaryEdge(C);
+//the fatou cycles arent part of (exclusively) the biggest components
+// let P = createPoly([[-1, 0], [1, 0], [2, 0], [0,0]]);
+// let Q = createPoly([[1, 0], [0, 0], [0, 0]]);
 
-plotArray(canvas, e.data, strength = 120);
+//cycle i->infty->i , it just looks cool (also, indifferent fixed point it seems (siegel disc?))
+// let P = createPoly([[-1, 0], [0, 0], [0, 1], [0,0]]);
+// let Q = createPoly([[1, 0], [0, 0], [1, 0]]);
+
+// //soccer ball
+// let P = createPoly([[-1, 0], [0, 0], [1, 0], [0, 0]]);
+// let Q = createPoly([[1, 0], [0, 0], [1, 0]]);
+
+// //cool weird thing
+// let P = createPoly([[-1, 0], [0, 0], [1, 0], [0, 0]]);
+// let Q = createPoly([[1, 0], [0, 0], [0, 1]]);
+
+let lamda = new Complex(Math.cos(2), Math.sin(2));
+let alpha = new Complex(0.2, -0.21);
+
+let P = [new Complex(0,0), new Complex(0,0), lamda, lamda.mult(alpha.conj())];
+let Q = [alpha, new Complex(1,0)];
 
 
-//Showing the dynamics
- 
-let s = 1; //width of points
 
-let xdense = 100; //how many points per row
-let ydense = 50; //how many points per column
-
-let X = jsn.linspace(z0.re, z1.re, xdense);
-let Y = jsn.linspace(z0.im, z1.im+0.1, ydense); //+0.1 is arbitrary, just for prettiness
-let points = [];
-
-for(let x of X){
-    for(let y of Y){
-        points.push(new Complex(x, y));
-    }
-}
-
-for(let p of points){
-    plotPoint(pcanvas, p, z0, z1, s);
-}
-
+// let Q = createPoly([[1, 0]]);
+let R = rational(P, Q);

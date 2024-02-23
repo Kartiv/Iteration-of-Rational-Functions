@@ -182,14 +182,20 @@ class jsn{
         // return Math.atan(z)/Math.PI+1/2;
     }
 
-    static transform(arr, f){
+    /**
+     * 
+     * @param {array} arr 
+     * @param {function} f 
+     * @returns applies f to each element of arr
+     */
+    static apply(arr, f){
         let b = [];
         
         for(let i=0; i<arr.length; i++){
             b.push(f(arr[i]));
         }
 
-        return arr;
+        return b;
     }
 
     /**
@@ -205,6 +211,120 @@ class jsn{
         }
 
         return a;
+    }
+
+
+    //FFT PART
+
+    /**
+     * 
+     * @param {Array} P polynomial in coefficient representation, assumed padded. use function "fpad" to pad a polynomial
+     * @returns value representation of P
+     */
+    static fft(P){
+
+        if(P.length == 1){
+            return P
+        }
+
+        let P_e = jsn.parse(P, 0, -1, 2);
+        let P_o = jsn.parse(P, 1, -1, 2);
+
+        let y_e = jsn.fft(P_e);
+        let y_o = jsn.fft(P_o);
+
+        let y = jsn.zeros(P.length);
+        let w = Complex.polar(1, 2*Math.PI/P.length);
+
+        for(let i=0; i<y_e.length; i++){
+            let wi = w.pow(i);
+            y[i] = wi.mult(y_o[i]).add(y_e[i]);
+            y[i+y_e.length] = (wi.mult(new Complex(-1,0)).mult(y_o[i])).add(y_e[i]);
+        }
+
+        return y;
+    }
+
+    /**
+     * 
+     * @param {array} P value representation of polynomial 
+     * @returns coefficient representation of polynomial
+     */
+    static ifft(P, depth = 0){
+
+        if(P.length == 1){
+            return P
+        }
+
+        let P_e = jsn.parse(P, 0, -1, 2);
+        let P_o = jsn.parse(P, 1, -1, 2);
+
+        let y_e = jsn.ifft(P_e, 1);
+        let y_o = jsn.ifft(P_o, 1);
+
+        let y = jsn.zeros(P.length);
+        let w = Complex.polar(1, -2*Math.PI/P.length);
+
+        for(let i=0; i<y_e.length; i++){
+            let wi = w.pow(i);
+            y[i] = wi.mult(y_o[i]).add(y_e[i]);
+            y[i+y_e.length] = (wi.mult(new Complex(-1,0)).mult(y_o[i])).add(y_e[i]);
+        }
+
+        if(depth){
+            return y;
+        }
+
+        let n = new Complex(1/P.length, 0);
+        return jsn.apply(y, (e)=>{return e.mult(n)})
+    }
+
+    /**
+     * Pads polynomial in coefficient representation to be of length a power of 2
+     * @param {Array} P 
+     * @returns Padded version of P
+     */
+    static fpad(P, extra = 0){
+        //extra is for multiplication, where we want the option to evaluate at a greater amount of roots of unity
+        let n = 2**(Math.ceil(Math.log2(P.length)) + extra);
+        if(P.length-n==0){
+            return P;
+        }
+
+        let padded = [];
+        for(let i=0; i<P.length; i++){
+            padded.push(P[i]);
+        }
+        for(let i=P.length; i<n; i++){
+            padded.push(new Complex(0,0));
+        }
+
+        return padded;
+    }
+
+    /**
+     * 
+     * @param {array} arr array
+     * @param {int} a starting index
+     * @param {int} b ending index (+1)
+     * @param {int} step how many elements skipped each time
+     * @returns in python syntax, return arr[a:b:step]
+     */
+    static parse(arr, a, b, step){
+
+        if(a<0){
+            return [];
+        }
+        if(b<0){
+            b = arr.length+1+b;
+        }
+
+        let newArr = [];
+        for(let i=a; i<b; i+=step){
+            newArr.push(arr[i]);
+        }
+
+        return newArr;
     }
 
 }
@@ -346,12 +466,23 @@ class Complex{
     }
 
     div(z){
-        let a = new Complex(1/z.abs, 0);
+        let a = new Complex(1/z.abs**2, 0);
         return a.mult(this.mult(z.conj()));
     }
 
     mult(z){
         return new Complex(this.re*z.re-this.im*z.im, this.re*z.im+this.im*z.re);
+    }
+
+    pow(n){
+        if(n==0){
+            return new Complex(1,0);
+        }
+        return this.mult(this.pow(n-1));
+    }
+
+    static polar(r, theta){
+        return new Complex(r*Math.cos(theta), r*Math.sin(theta));
     }
 
 }
@@ -549,7 +680,6 @@ class Matrix{
         return new Matrix(A);
     }
 }
-
 
 class Graph{
     /**

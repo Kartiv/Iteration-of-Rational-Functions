@@ -7,12 +7,58 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <canvas id="canvas"></canvas>
-    <canvas id="pcanvas"></canvas>
-    <button id="biterate" onclick = "biterateFunc()"></button>
+
+    <div id="view">
+
+        <canvas class = "Canvas" id="canvas"></canvas>
+        <canvas class = "Canvas" id="pcanvas"></canvas>
+        
+        <div id="UI">
+            <button class="button" id="Generate Julia Set" onclick = "juliaFunc()"> Generate Julia Set </button>
+            <button class = "button" id="Generate Points" onclick = "pointsFunc()"> Generate Points </button>
+            <button class="button" id="biterate" onclick = "biterateFunc()"> Apply R </button>
+        </div>
+
+
+        <div id="Parameters">
+            <div class = "parameter" id="P"> P(z) = -1 + z^2 </div>
+            <div class = "parameter" id="Q"> Q(z) = 1 + z^2 </div>
+            <div> ---- </div>
+            <div class = "parameter" id = "minz"> minz : -2 - 2i </div>
+            <div class = "parameter" id= "maxz"> maxz : 2 + 2i </div>
+            <div class = "parameter" id = "xdensediv"> x points density: 100 </div>
+            <div class = "parameter" id = "ydensediv"> y points density: 50 </div>
+
+            <div class = "parameter" id="pwidth"> Point Width : 1 </div>
+        </div>
+
+        <div id="ParameterUI">
+
+            <!-- <form>
+                <label class = "parameter" for="P"> P(z): </label><br>
+                <input type="number" id="P" name="P" value="100"><br>
+                <label class = "parameter" for="Q"> Q(z): </label><br>
+                <input type="number" id="Q" name="Q" value="50"><br><br>
+            </form>
+            <button onclick="updatePoly()"> Update </button><br><br>
+
+            <form>
+                <label class = "parameter" for="xdense"> X Density: </label><br>
+                <input type="number" id="xdense" name="xdense" value="100"><br>
+                <label class = "parameter" for="ydense"> Y Density: </label><br>
+                <input type="number" id="ydense" name="ydense" value="50"><br><br>
+            </form>
+            <button onclick="updateDensity()"> Update </button> -->
+
+
+        </div>
+
+
+    </div>
     
 
     <script src="imports.js"></script>
     <script src="script.js"></script>
+    <script src="index.js"></script>
 </body>
 </html>
