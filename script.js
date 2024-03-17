@@ -267,18 +267,23 @@ function divide_poly(P, Q){ //assuming Q is a degree 1 polynomial which divides 
             break;
         }
     }
-
+    
     //divide values
 
     let h = [];
-    for(let i=0; i<vP.length; i++){
+
+    let m = vP.length;
+    let woff = Complex.polar(1, 2*Math.PI*n / m).add(new Complex(0.00001, 0.00001));
+
+    for(let i=0; i<m; i++){
         if(i==n){
-            h.push((vP[i].add(new Complex(0.00001, 0.00001))).div(vQ[i].add(new Complex(0.00001, 0.00001))));
+            h.push(evaluate(P, woff).div(evaluate(Q, woff)));
         }
         else{
             h.push(vP[i].div(vQ[i]));
         }
     }
+
 
     return remove_trailing_zeros(jsn.ifft(h));
 
@@ -330,7 +335,7 @@ function julia_fixed_point(P, Q){ //finds fixed point of a rational function P/Q
         }
 
         else{
-            H = divide_poly(H, [r1, new Complex(1,0)]);
+            H = divide_poly(H, [r1.mult(new Complex(-1, 0)), new Complex(1,0)]);
         }
 
     }
