@@ -267,7 +267,7 @@ function divide_poly(P, Q){ //assuming Q is a degree 1 polynomial which divides 
             break;
         }
     }
-    
+
     //divide values
 
     let h = [];
@@ -405,20 +405,23 @@ function julia(P, Q, niter){
 // let P = createPoly([[-1, 0], [0, 0], [0, 1], [0,0]]);
 // let Q = createPoly([[1, 0], [0, 0], [1, 0]]);
 
-// //soccer ball
-// let P = createPoly([[-1, 0], [0, 0], [1, 0], [0, 0]]);
-// let Q = createPoly([[1, 0], [0, 0], [1, 0]]);
+//soccer ball
+let P = createPoly([[-1, 0], [0, 0], [1, 0], [0, 0]]);
+let Q = createPoly([[1, 0], [0, 0], [1, 0]]);
 
 // //cool weird thing
 // let P = createPoly([[-1, 0], [0, 0], [1, 0], [0, 0]]);
 // let Q = createPoly([[1, 0], [0, 0], [0, 1]]);
 
-let lamda = new Complex(Math.cos(2), Math.sin(2));
-let alpha = new Complex(0.2, -0.21);
+// let lamda = new Complex(Math.cos(2), Math.sin(2));
+// let alpha = new Complex(0.2, -0.21);
 
-let P = [new Complex(0,0), new Complex(0,0), lamda, lamda.mult(alpha.conj())];
-let Q = [alpha, new Complex(1,0)];
+// let P = [new Complex(0,0), new Complex(0,0), lamda, lamda.mult(alpha.conj())];
+// let Q = [alpha, new Complex(1,0)];
 
+// //cool weird thing
+// let P = createPoly([[0, 0], [1, 0], [1, 0], [0, 0]]);
+// let Q = createPoly([[1, 0], [0, 0], [0, 0]]);
 
 
 // let Q = createPoly([[1, 0]]);
